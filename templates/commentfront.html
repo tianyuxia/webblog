@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<form method="post">
+    {{ post.render() | safe }}
+    <br>
+    <hr>
+    <br><br>
+
+    {% for comment in comments %}
+        {{ comment.render() | safe }}
+        {% if currentuser == comment.author %}
+            <br>
+            <input type="submit" name="edit{{comment.key().id()}}" value="Edit Comment">
+            <input type="submit" name="delete{{comment.key().id()}}" value="Delete Comment">
+            <br><br>
+        {% endif %}
+    {% endfor %}
+    <br><br>
+    {% if currentuser != 'Guest' %}
+    <input type="submit" name="newcomment" value="New Comment">
+    {% endif %}
+    <input type="submit" name="back" value="Back to Post">
+</form>
+
+{% endblock %}

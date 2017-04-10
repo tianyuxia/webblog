@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<form method="post">
+    {% if currentuser != 'Guest' %}
+    <input type="submit" name="newpost" value="New Blog Post">
+    {% endif %}
+</form>
+
+<br><br>
+<form method="post">
+    {% for post in posts %}
+        {{ post.render() | safe }}
+        {% if currentuser != post.author %}
+            <br>
+            {% if currentuser != 'Guest' %}
+                {% if post.liked_by_user(currentuser) %}
+                    <div>You've already liked this post</div>
+                    <br>
+                {% else %}
+                    <input type="submit" name="like{{post.key().id()}}" value="Like">
+                {% endif %}
+            {% endif %}
+            <input type="submit" name="comment{{post.key().id()}}" value="Comments">
+        <br><br>
+        {% elif currentuser == post.author and currentuser != 'Guest' %}
+            <br>
+            <input type="submit" name="edit{{post.key().id()}}" value="Edit Post">
+            <input type="submit" name="delete{{post.key().id()}}" value="Delete Post">
+            <br><br>
+        {% endif %}
+    {% endfor %}
+    <br><br>
+</form>
+
+{% endblock %}

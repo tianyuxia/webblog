@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link type="text/css" rel="stylesheet" href="/static/main.css" />
+
+  <title>Web Blog</title>
+</head>
+
+<body>
+  <a class="main-title">
+    Web Blog
+  </a>
+  {% if currentuser %}
+    <h2>Welcome! {{currentuser}} </h2>
+  {% endif %}
+
+  {% if currentuser == 'Guest' %}
+    <div class="error">
+        When browsing in Guest mode, users cannot create, edit, delete, or like a blog or ascii art. Please logout to register an account for full functionality!
+    </div>
+    <br><br>
+  {% endif %}
+
+  <div id="content">
+  {% block content %}
+  {% endblock %}
+  </div>
+  <br>
+{% if currentuser %}
+  <form method="post">
+      <input type="submit" name="logout" value="Logout">
+  </form>
+ {% endif %}
+</body>
+
+</html>
+

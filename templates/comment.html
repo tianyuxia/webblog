@@ -1,0 +1,15 @@
+<div class="comment">
+  <div class="comment-heading">
+    <div class="comment-title">
+      Commented by: {{comment.author}}
+    </div>
+
+    <div class="comment-date">
+      {{comment.last_modified.strftime("%b %d, %Y")}}
+    </div>
+  </div>
+
+  <div class="comment-content">
+    {{comment._render_text | safe}}
+  </div>
+</div>

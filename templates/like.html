@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+    {{post.render() | safe}}
+    <br><br>
+    <form method="post">
+        <h3>Please confirm that you are liking the post.</h3>
+        <input type="submit" name="likepost" value="Confirm Like">
+        <input type="submit" name="back" value="Back to Post">
+    </form>
+{% endblock %}

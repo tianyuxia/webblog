@@ -1,0 +1,28 @@
+<div class="post">
+  <div class="post-heading">
+    <div class="post-user">
+      Posted by: {{post.author}}      
+    </div>
+    <div class="post-title">
+      {{post.title}}
+    </div>
+
+    <div class="post-date">
+      {{post.last_modified.strftime("%b %d, %Y")}}
+    </div>
+
+    <div class="post-likes">
+      Likes: {{post.get_like()}}
+    </div>
+
+      <div class="post-comment">
+      # of Comments: {{post.comment_num}}
+    </div>
+  </div>
+
+  <div class="post-content">
+    {{post._render_text | safe}}
+  </div>
+
+
+</div>
