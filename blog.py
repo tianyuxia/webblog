@@ -346,6 +346,7 @@ class CommentFrontHandler(Handler):
                 p = Post.by_id(int(post_id))
                 p.comment_num = p.comment_num - 1
                 p.put()
+                time.sleep(0.1)
                 self.redirect('/comment/%s' % post_id)
         if newcomment:
             self.redirect('/newcomment/%s' % post_id)
@@ -354,6 +355,7 @@ class CommentFrontHandler(Handler):
         if logout:
             self.redirect('/logout')
 
+# New comment handler handles creation of new comments
 class NewCommentHandler(Handler):
     def get(self, post_id):
         post = Post.by_id(int(post_id))
@@ -372,6 +374,7 @@ class NewCommentHandler(Handler):
                 c.put()
                 p.comment_num = p.comment_num + 1
                 p.put()
+                time.sleep(0.1)
                 self.redirect('/comment/%s' % post_id)
             else:
                 error = "Please do not leave a blank comment!"
@@ -381,6 +384,7 @@ class NewCommentHandler(Handler):
         if logout:
             self.redirect('/logout')
 
+# Edit comment handler handles editing of comments
 class EditCommentHandler(Handler):
     def get(self, comment_id, post_id):
         c = Comment.by_id(int(comment_id))
@@ -397,6 +401,7 @@ class EditCommentHandler(Handler):
                 c = Comment.by_id(int(comment_id))
                 c.content = content
                 c.put()
+                time.sleep(0.1)
                 self.redirect('/comment/%s' % post_id)
         if back:
             self.redirect('/comment/%s' % post_id)
@@ -430,6 +435,7 @@ class NewPostHandler(Handler):
         elif logout:
             self.redirect('/logout')
 
+# Single post handler display the added post after user make new post
 class SinglePostHandler(Handler):
     def get(self, post_id):
         post = Post.by_id(int(post_id))
@@ -476,6 +482,7 @@ class EditPostHandler(Handler):
         if logout:
             self.redirect('/logout')
 
+# Delete post handler help with deleting posts
 class DeletePostHandler(Handler):
     def get(self, post_id):
         p = Post.by_id(int(post_id))
@@ -496,6 +503,7 @@ class DeletePostHandler(Handler):
         if logout:
             self.redirect('/logout')
 
+# Like handler helps with managing likes for the posts
 class LikePostHandler(Handler):
     def get(self, post_id):
         p = Post.by_id(int(post_id))
@@ -512,6 +520,7 @@ class LikePostHandler(Handler):
             p = Post.by_id(int(post_id))
             p.liked_list.append(str(self.user.name))
             p.put()
+            time.sleep(0.1)
             self.redirect('/blog')
         if logout:
             self.redirect('/logout')
@@ -519,13 +528,11 @@ class LikePostHandler(Handler):
 class DebugHandler(Handler):
     def get(self):
         self.render('debug.html', value="Debug")
-        posts = Post.all()
-        for p in posts:
-            self.render('debug.html', value=p.liked_list)
 
     def post(self):
         clearuser = self.request.get('clearuser')
         clearpost = self.request.get('clearpost')
+        clearcomment = self.request.get('clearcomment')
         pop = self.request.get('populate')
 
         if clearuser:
@@ -538,6 +545,11 @@ class DebugHandler(Handler):
             if post:
                 for p in post:
                     p.delete()
+        if clearcomment:
+            comment = Comment.all()
+            if comment:
+                for c in comment:
+                    c.delete()
         if pop:
             for name in ['Terry', 'Cindy', 'Ricky', 'Arvin', 'Mika']:
                 populate(name, 2)
