@@ -5,17 +5,16 @@
     <br>
     <hr>
     <br><br>
-    <h2>Edit Comment</h2>
+    <h2>Delete Comment</h2>
 
     <form method="post">
       <label>
-        <div>Edit Your Comment</div>
-        <textarea name="content">{{content}}</textarea>
+        <div>Please confirm that you wish to delete the comment</div>
       </label>
 
       <div class="error">{{error}}</div>
       <br><br>
-      <input type="submit" name="edit" value="Edit Comment">
+      <input type="submit" name="delete" value="Delete Comment">
       <input type="submit" name="back" value="Back to Comment">
     </form>
 {% endblock %}

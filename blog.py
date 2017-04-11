@@ -76,6 +76,18 @@ def valid_password(password):
 def valid_email(email):
     return not email or EMAIL_RE.match(email)
 
+def login_required(func):
+    """
+    A decorator to confirm a user is logged in or redirect as needed.
+    """
+    def login(self, *args, **kwargs):
+        # Redirect to login if user not logged in, else execute func.
+        if not self.user:
+            self.redirect("/login")
+        else:
+            func(self, *args, **kwargs)
+    return login
+
 # GQL datastore entity, used to store user information
 class User(db.Model):
     name = db.StringProperty(required=True)
@@ -290,6 +302,7 @@ class BlogFrontHandler(Handler):
         posts = db.GqlQuery("select * from Post order by last_modified desc limit 10")
         self.render('blogfront.html', posts = posts, currentuser=self.user.name)
 
+    @login_required
     def post(self):
         # Check if newpost or showascii buttons are hit
         newpost = self.request.get('newpost')
@@ -327,6 +340,7 @@ class CommentFrontHandler(Handler):
         post = Post.by_id(int(post_id))
         self.render('commentfront.html', currentuser=self.user.name, post=post, comments=comments)
 
+    @login_required
     def post(self, post_id):
         newcomment = self.request.get('newcomment')
         logout = self.request.get('logout')
@@ -342,12 +356,7 @@ class CommentFrontHandler(Handler):
             if editcomment:
                 self.redirect('/editcomment/%s/%s' % (comment_id, post_id))
             if deletecomment:
-                c.delete()
-                p = Post.by_id(int(post_id))
-                p.comment_num = p.comment_num - 1
-                p.put()
-                time.sleep(0.1)
-                self.redirect('/comment/%s' % post_id)
+                self.redirect('/deletecomment/%s/%s' % (comment_id, post_id))
         if newcomment:
             self.redirect('/newcomment/%s' % post_id)
         if back:
@@ -361,6 +370,7 @@ class NewCommentHandler(Handler):
         post = Post.by_id(int(post_id))
         self.render('newcomment.html', currentuser=self.user.name, post=post)
 
+    @login_required
     def post(self, post_id):
         submit = self.request.get('submit')
         back = self.request.get('back')
@@ -388,8 +398,10 @@ class NewCommentHandler(Handler):
 class EditCommentHandler(Handler):
     def get(self, comment_id, post_id):
         c = Comment.by_id(int(comment_id))
-        self.render('editcomment.html', currentuser=self.user.name, content=c.content)
+        p = Post.by_id(int(post_id))
+        self.render('editcomment.html', currentuser=self.user.name, content=c.content, post=p)
 
+    @login_required
     def post(self, comment_id, post_id):
         edit = self.request.get('edit')
         back = self.request.get('back')
@@ -397,12 +409,47 @@ class EditCommentHandler(Handler):
 
         if edit:
             content = self.request.get('content')
-            if content:
-                c = Comment.by_id(int(comment_id))
+            c = Comment.by_id(int(comment_id))
+            if content and self.user.name == c.author:
                 c.content = content
                 c.put()
                 time.sleep(0.1)
                 self.redirect('/comment/%s' % post_id)
+            else:
+                if content:
+                    error = "You cannot edit another user's comments!"
+                else:
+                    error = "Please do not leave the content section blank!"
+                self.render('editcomment.html', currentuser=self.user.name, content=c.content, error=error)
+        if back:
+            self.redirect('/comment/%s' % post_id)
+        if logout:
+            self.redirect('/logout')
+
+class DeleteCommentHandler(Handler):
+    def get(self, comment_id, post_id):
+        c = Comment.by_id(int(comment_id))
+        p = Post.by_id(int(post_id))
+        self.render('deletecomment.html', currentuser=self.user.name, content=c.content, post=p)
+
+    @login_required
+    def post(self, comment_id, post_id):
+        delete = self.request.get('delete')
+        back = self.request.get('back')
+        logout = self.request.get('logout')
+
+        if delete:
+            c = Comment.by_id(int(comment_id))
+            if self.user.name == c.author:
+                c.delete()
+                p = Post.by_id(int(post_id))
+                p.comment_num = p.comment_num - 1
+                p.put()
+                time.sleep(0.1)
+                self.redirect('/comment/%s' % post_id)
+            else:
+                error = "You cannot delete another user's comment!"
+                self.render('deletecomment.html', currentuser=self.user.name, content=c.content, error=error)
         if back:
             self.redirect('/comment/%s' % post_id)
         if logout:
@@ -413,6 +460,7 @@ class NewPostHandler(Handler):
     def get(self):
         self.render('newpost.html', currentuser=self.user.name)
 
+    @login_required
     def post(self):
         # Check if submit or back button
         submit = self.request.get('submit')
@@ -444,6 +492,7 @@ class SinglePostHandler(Handler):
             return
         self.render("newpostlink.html", post = post, currentuser=self.user.name)
 
+    @login_required
     def post(self, post_id):
         back = self.request.get('back')
         logout = self.request.get('logout')
@@ -458,6 +507,7 @@ class EditPostHandler(Handler):
         p = Post.by_id(int(post_id))
         self.render('edit.html', currentuser=self.user.name, title=p.title, content=p.content)
 
+    @login_required
     def post(self, post_id):
         # Check if submit or back button
         confirm = self.request.get('confirm')
@@ -469,15 +519,18 @@ class EditPostHandler(Handler):
         if confirm:
             title = self.request.get('subject')
             content = self.request.get('content')
-            if title and content:
-                p = Post.by_id(int(post_id))
+            p = Post.by_id(int(post_id))
+            if title and content and self.user.name == p.author:
                 p.title = title
                 p.content = content
                 p.put()
                 time.sleep(0.1)
                 self.redirect('/blog')
             else:
-                error = "Please complete both subject and content please!"
+                if self.user.name != p.author:
+                    error = "You cannot edit another user's post"
+                else:
+                    error = "Please complete both subject and content please!"
                 self.render('edit.html', currentuser=self.user.name, title=title, content=content, error=error)
         if logout:
             self.redirect('/logout')
@@ -488,6 +541,7 @@ class DeletePostHandler(Handler):
         p = Post.by_id(int(post_id))
         self.render('delete.html', currentuser=self.user.name, post=p)
 
+    @login_required
     def post(self, post_id):
         delete = self.request.get('delete')
         back = self.request.get('back')
@@ -497,9 +551,13 @@ class DeletePostHandler(Handler):
             self.redirect('/blog')
         if delete:
             p = Post.by_id(int(post_id))
-            p.delete()
-            time.sleep(0.1)
-            self.redirect('/blog')
+            if p.author == self.user.name:
+                p.delete()
+                time.sleep(0.1)
+                self.redirect('/blog')
+            else:
+                error = "You cannot delete another user's post!"
+                self.render('delete.html', currentuser=self.user.name, post=p, error=error)
         if logout:
             self.redirect('/logout')
 
@@ -509,6 +567,7 @@ class LikePostHandler(Handler):
         p = Post.by_id(int(post_id))
         self.render('like.html', currentuser=self.user.name, post=p)
 
+    @login_required
     def post(self, post_id):
         likepost = self.request.get('likepost')
         back = self.request.get('back')
@@ -518,10 +577,18 @@ class LikePostHandler(Handler):
             self.redirect('/blog')
         if likepost:
             p = Post.by_id(int(post_id))
-            p.liked_list.append(str(self.user.name))
-            p.put()
-            time.sleep(0.1)
-            self.redirect('/blog')
+            if p.author != self.user.name and not p.liked_by_user(self.user.name):
+                p.liked_list.append(str(self.user.name))
+                p.put()
+                time.sleep(0.1)
+                self.redirect('/blog')
+            else:
+                error = ""
+                if p.author == self.user.name:
+                    error = "You cannot like your own post!"
+                if p.liked_by_user(self.user.name):
+                    error = "You cannot like a post more than once!"
+                self.render('like.html', currentuser=self.user.name, post=p, error=error)
         if logout:
             self.redirect('/logout')
 
@@ -569,7 +636,8 @@ app = webapp2.WSGIApplication([('/', LoginHandler),
                                ('/like/([0-9]+)', LikePostHandler),
                                ('/comment/([0-9]+)', CommentFrontHandler),
                                ('/newcomment/([0-9]+)', NewCommentHandler),
-                               ('/editcomment/([0-9]+)/([0-9]+)', EditCommentHandler)],
+                               ('/editcomment/([0-9]+)/([0-9]+)', EditCommentHandler),
+                               ('/deletecomment/([0-9]+)/([0-9]+)', DeleteCommentHandler)],
                               debug=True)
 
 
