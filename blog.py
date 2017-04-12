@@ -76,17 +76,35 @@ def valid_password(password):
 def valid_email(email):
     return not email or EMAIL_RE.match(email)
 
-def login_required(func):
-    """
-    A decorator to confirm a user is logged in or redirect as needed.
-    """
-    def login(self, *args, **kwargs):
+
+# Defining decorators for
+def user_logged_in(func):
+    def wrapper(self, *args, **kwargs):
         # Redirect to login if user not logged in, else execute func.
         if not self.user:
             self.redirect("/login")
         else:
             func(self, *args, **kwargs)
-    return login
+    return wrapper
+
+def post_exists(func):
+    def wrapper(self, post_id):
+        post = Post.by_id(int(post_id))
+        if post:
+            return func(self, post_id)
+        else:
+            self.redirect('/login')
+    return wrapper
+
+def comment_post_combo_exists(func):
+    def wrapper(self, comment_id, post_id):
+        comment = Comment.by_id(int(comment_id))
+        post = Post.by_id(int(post_id))
+        if post and comment:
+            return func(self, comment_id, post_id)
+        else:
+            self.redirect('/login')
+    return wrapper
 
 # GQL datastore entity, used to store user information
 class User(db.Model):
@@ -302,7 +320,7 @@ class BlogFrontHandler(Handler):
         posts = db.GqlQuery("select * from Post order by last_modified desc limit 10")
         self.render('blogfront.html', posts = posts, currentuser=self.user.name)
 
-    @login_required
+    @user_logged_in
     def post(self):
         # Check if newpost or showascii buttons are hit
         newpost = self.request.get('newpost')
@@ -332,6 +350,7 @@ class BlogFrontHandler(Handler):
 
 # Comment front handler handles the display of comments to the user
 class CommentFrontHandler(Handler):
+    @post_exists
     def get(self, post_id):
         # Query for the last 10 comments for the post associated with the post_id
         comments = db.GqlQuery("select * from Comment where post_id = %s order by last_modified desc limit 10"
@@ -340,7 +359,8 @@ class CommentFrontHandler(Handler):
         post = Post.by_id(int(post_id))
         self.render('commentfront.html', currentuser=self.user.name, post=post, comments=comments)
 
-    @login_required
+    @user_logged_in
+    @post_exists
     def post(self, post_id):
         newcomment = self.request.get('newcomment')
         logout = self.request.get('logout')
@@ -366,11 +386,13 @@ class CommentFrontHandler(Handler):
 
 # New comment handler handles creation of new comments
 class NewCommentHandler(Handler):
+    @post_exists
     def get(self, post_id):
         post = Post.by_id(int(post_id))
         self.render('newcomment.html', currentuser=self.user.name, post=post)
 
-    @login_required
+    @user_logged_in
+    @post_exists
     def post(self, post_id):
         submit = self.request.get('submit')
         back = self.request.get('back')
@@ -396,12 +418,14 @@ class NewCommentHandler(Handler):
 
 # Edit comment handler handles editing of comments
 class EditCommentHandler(Handler):
+    @comment_post_combo_exists
     def get(self, comment_id, post_id):
         c = Comment.by_id(int(comment_id))
         p = Post.by_id(int(post_id))
         self.render('editcomment.html', currentuser=self.user.name, content=c.content, post=p)
 
-    @login_required
+    @user_logged_in
+    @comment_post_combo_exists
     def post(self, comment_id, post_id):
         edit = self.request.get('edit')
         back = self.request.get('back')
@@ -427,12 +451,14 @@ class EditCommentHandler(Handler):
             self.redirect('/logout')
 
 class DeleteCommentHandler(Handler):
+    @comment_post_combo_exists
     def get(self, comment_id, post_id):
         c = Comment.by_id(int(comment_id))
         p = Post.by_id(int(post_id))
         self.render('deletecomment.html', currentuser=self.user.name, content=c.content, post=p)
 
-    @login_required
+    @user_logged_in
+    @comment_post_combo_exists
     def post(self, comment_id, post_id):
         delete = self.request.get('delete')
         back = self.request.get('back')
@@ -460,7 +486,7 @@ class NewPostHandler(Handler):
     def get(self):
         self.render('newpost.html', currentuser=self.user.name)
 
-    @login_required
+    @user_logged_in
     def post(self):
         # Check if submit or back button
         submit = self.request.get('submit')
@@ -476,38 +502,24 @@ class NewPostHandler(Handler):
             if title and content:
                 p = Post.makepost(title=title, content=content, author=self.user.name)
                 p.put()
-                self.redirect('/blog/%s' % str(p.key().id()))
+                time.sleep(0.1)
+                self.redirect('/blog')
             else:
                 error = "Please complete both subject and content please!"
                 self.render('newpost.html', currentuser=self.user.name, title=title, content=content, error=error)
         elif logout:
             self.redirect('/logout')
 
-# Single post handler display the added post after user make new post
-class SinglePostHandler(Handler):
-    def get(self, post_id):
-        post = Post.by_id(int(post_id))
-        if not post:
-            self.error(404)
-            return
-        self.render("newpostlink.html", post = post, currentuser=self.user.name)
-
-    @login_required
-    def post(self, post_id):
-        back = self.request.get('back')
-        logout = self.request.get('logout')
-        if back:
-            self.redirect('/blog')
-        elif logout:
-            self.redirect('/logout')
 
 # New Post Page Handler
 class EditPostHandler(Handler):
+    @post_exists
     def get(self, post_id):
         p = Post.by_id(int(post_id))
         self.render('edit.html', currentuser=self.user.name, title=p.title, content=p.content)
 
-    @login_required
+    @user_logged_in
+    @post_exists
     def post(self, post_id):
         # Check if submit or back button
         confirm = self.request.get('confirm')
@@ -537,11 +549,13 @@ class EditPostHandler(Handler):
 
 # Delete post handler help with deleting posts
 class DeletePostHandler(Handler):
+    @post_exists
     def get(self, post_id):
         p = Post.by_id(int(post_id))
         self.render('delete.html', currentuser=self.user.name, post=p)
 
-    @login_required
+    @user_logged_in
+    @post_exists
     def post(self, post_id):
         delete = self.request.get('delete')
         back = self.request.get('back')
@@ -563,11 +577,13 @@ class DeletePostHandler(Handler):
 
 # Like handler helps with managing likes for the posts
 class LikePostHandler(Handler):
+    @post_exists
     def get(self, post_id):
         p = Post.by_id(int(post_id))
         self.render('like.html', currentuser=self.user.name, post=p)
 
-    @login_required
+    @user_logged_in
+    @post_exists
     def post(self, post_id):
         likepost = self.request.get('likepost')
         back = self.request.get('back')
@@ -629,7 +645,6 @@ app = webapp2.WSGIApplication([('/', LoginHandler),
                                ('/signup', SignupHandler),
                                ('/logout', LogoutHandler),
                                ('/blog', BlogFrontHandler),
-                               ('/blog/([0-9]+)', SinglePostHandler),
                                ('/newpost', NewPostHandler),
                                ('/edit/([0-9]+)', EditPostHandler),
                                ('/delete/([0-9]+)', DeletePostHandler),
